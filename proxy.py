@@ -30,10 +30,9 @@ class Proxy:
 
         if data["meta"].startswith("CONNECT"):
             client.sendall("HTTP/1.1 200 OK\r\n\r\n".encode())
-            
+
             client.setblocking(False)
             server.setblocking(False)
-
             while True:
                 try:
                     data = client.recv(self.buffer_size)
@@ -57,9 +56,11 @@ class Proxy:
             server.sendall(data["source"])
 
             response = server.recv(self.buffer_size)
-            while (not response.endswith(b"\r\n\r\n")):
-                response += server.recv(self.buffer_size)
-            
+            try:
+                while len(response) < self.parse(response)["headers"]["Content-Length"]:
+                    response += server.recv(self.buffer_size)
+            except KeyError:
+                pass
             client.sendall(response)
             server.close()
             client.close()
@@ -84,12 +85,13 @@ class Proxy:
         for head in heads:
             k, v = head.split(b": ")
             data["headers"][k.decode("utf-8")] = v.decode("utf-8")
-
-        tmp = data["headers"]["Host"].split(":")
-        data["host"] = tmp[0]
-        if (len(tmp) == 2):
-            data["port"] = int(tmp[1])
-
+        try:
+            tmp = data["headers"]["Host"].split(":")
+            data["host"] = tmp[0]
+            if (len(tmp) == 2):
+                data["port"] = int(tmp[1])
+        except KeyError:
+            pass
         return data
 
 
